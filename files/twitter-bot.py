@@ -66,6 +66,7 @@ class TwitterBot:
             if t < timespan:
                 break
             full_text = stat.text
+            full_text = full_text.replace('\n', ' - ')
             text = full_text.split('https://t.co/')[0].strip()
             if text and text[-1] == '.':
                 text = text[-1]
