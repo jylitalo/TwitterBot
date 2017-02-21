@@ -1,2 +1,41 @@
 ---
 # tasks file for TwitterBot
+- name: install pip
+  package:
+    name: python-pip
+    state: present
+- name: install twitter API for python
+  pip:
+    name: python-twitter
+    state: present
+- name: user for cronjob
+  user:
+    name: "{{ twitbot_user }}"
+    comment: TwitterBot
+    home: "{{ twitbot_home }}"
+    system: yes
+- name: ensure directory is private
+  file:
+    path: "{{ twitbot_home }}"
+    state: directory
+    owner: "{{ twitbot_user }}"
+    mode: 0700
+- name: install python script
+  copy:
+    src: "{{ role_path }}/files/twitter-bot.py"
+    dest: "{{ twitbot_bin }}"
+    owner: "{{ twitbot_user }}"
+    mode: 0700
+- name: install configuration
+  template:
+    src: "{{ role_path }}/templates/twitter-bot.cf.j2"
+    dest: "{{ twitbot_cf }}"
+    owner: "{{ twitbot_user }}"
+    mode: 0600
+    backup: yes
+- name: schedule reporting
+  cron:
+    name: TwitterBot
+    job: "{{ twitbot_bin }} --config {{ twitbot_cf }}"
+    special_time: daily
+    user: "{{ twitbot_user }}"
