@@ -49,7 +49,7 @@ class TwitterBot:
                 consumer_secret=cf.get('api', 'consumer_secret'))
         return self._api
 
-    def _get_report(self, user):
+    def _get_report(self, user, remove):
         """
         Fetch unique tweets from single Twitter account.
         """
@@ -66,7 +66,9 @@ class TwitterBot:
             if t < timespan:
                 break
             full_text = stat.text
-            full_text = full_text.replace('\n', ' - ')
+            full_text = full_text.replace('\n', ' ')
+            if remove:
+                full_text = full_text.replace(remove, '').replace('  ', ' ')
             text = full_text.split('https://t.co/')[0].strip()
             if text and text[-1] == '.':
                 text = text[-1]
@@ -130,8 +132,11 @@ class TwitterBot:
         for topic in topics:
             report = {}
             users = cf.get(topic, 'users').split(',')
+            remove = None
+            if cf.has_option(topic ,'remove'):
+                remove = cf.get(topic, 'remove')
             for user in users:
-                report[user] = self._get_report(user)
+                report[user] = self._get_report(user, remove)
             self._send_report(topic, self._make_text(report))
 
 
