@@ -77,10 +77,11 @@ class TwitterBot:
         report.append((len(uniq_text), skipped_items))
         return report
 
-    def _make_text(self, users, report):
+    def _make_text(self, report):
         """
         Format tweets into nice text.
         """
+        users = report.keys()
         text = ['Twitter report on: ' + ', '.join(users), '']
         for user in users:
             found, skipped = report[user].pop(-1)
@@ -130,7 +131,7 @@ class TwitterBot:
             users = cf.get(topic, 'users').split(',')
             for user in users:
                 report[user] = self._get_report(user)
-            self._send_report(topic, self._make_text(users, report))
+            self._send_report(topic, self._make_text(report))
 
 
 def cmdArgs():
