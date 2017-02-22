@@ -28,3 +28,4 @@ twitbot_user: twitbot
 twitbot_home: /home/twitbot
 twitbot_bin: "{{ twitbot_home }}/twitter-bot.py"
 twitbot_conf: "{{ twitbot_home }}/twitter-bot.cf"
+twitbot_cf: ""

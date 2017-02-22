@@ -36,6 +36,40 @@ class TwitterBot:
             assert api_found, 'Twitter API credentials missing.'
         return self._cf
 
+    def validate_config(self):
+        """
+        Validate TwitterBot configuration.
+        Return empty list, if configuration is valid.
+        If errors were found, return list of findings
+        """
+        errors = []
+        cf = self._get_config()
+        sections = cf.sections()
+        # Validate Twitter API section
+        if 'api' in sections:
+            for key in ['access_token_key', 'access_token_secret',
+                        'consumer_key', 'consumer_secret']:
+                if not cf.has_option('api', key):
+                    errors += [key + ' is missing from api section.']
+            sections.remove('api')
+        else:
+            errors += ['api section missing from configuration file']
+
+        # Validate feeds
+        api = self._get_api()
+        for section in sections:
+            for key in ['from', 'mailto', 'subject', 'users']:
+                if not cf.has_option(section, key):
+                    errors += [section + " doesn't have " + key]
+            if cf.has_option(section, 'users'):
+                for user in cf.get(section, 'users').split(','):
+                    try:
+                        api.GetUserTimeline(screen_name=user, count=1)
+                    except twitter.error.TwitterError, e:
+                        msg = "[%s,users] %s => %s"
+                        errors += [msg % (section, user, str(e))]
+        return errors
+
     def _get_api(self):
         """
         Get handler for Twitter API.
@@ -58,6 +92,8 @@ class TwitterBot:
         timespan = self._started - (days*86400)
         api = self._get_api()
         skipped_items = 0
+        if self.debug:
+            print("Fetching %s timeline." % (user))
         stats = api.GetUserTimeline(
             screen_name=user, count=self.__max_items, include_rts=False)
         uniq_text = set()
@@ -133,7 +169,7 @@ class TwitterBot:
             report = {}
             users = cf.get(topic, 'users').split(',')
             remove = None
-            if cf.has_option(topic ,'remove'):
+            if cf.has_option(topic, 'remove'):
                 remove = cf.get(topic, 'remove')
             for user in users:
                 report[user] = self._get_report(user, remove)
@@ -149,6 +185,8 @@ def cmdArgs():
                         default='.twitter-bot.cf')
     parser.add_argument('--debug', action='store_true',
                         help='print report instead of sending e-mail')
+    parser.add_argument('--validate', action='store_true',
+                        help='validate configuration file')
     return parser
 
 
@@ -156,5 +194,13 @@ if __name__ == '__main__':
     cmdline = cmdArgs()
     args = cmdline.parse_args(sys.argv[1:])
     tb = TwitterBot(args.config, args.debug)
-    tb.make_reports()
+    if args.validate:
+        errors = tb.validate_config()
+        if errors:
+            print('Following errors found from configuration:')
+            print('\n'.join(errors))
+            sys.exit(1)
+        print('No errors found in configuration.')
+    else:
+        tb.make_reports()
     sys.exit(0)
