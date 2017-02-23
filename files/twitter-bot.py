@@ -121,6 +121,7 @@ class TwitterBot:
         Format tweets into nice text.
         """
         users = report.keys()
+        users.sort()
         text = ['Twitter report on: ' + ', '.join(users), '']
         for user in users:
             found, skipped = report[user].pop(-1)
