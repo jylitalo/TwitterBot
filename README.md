@@ -1,7 +1,9 @@
 TwitterBot
 ==========
 
-Digest twitter feeds (eliminate duplicates) Edit
+Digest twitter feeds (eliminate duplicates)
+
+![Build status](https://travis-ci.org/jylitalo/TwitterBot.svg?branch=master) 
 
 Requirements
 ------------
