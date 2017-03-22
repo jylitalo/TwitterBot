@@ -95,7 +95,8 @@ class TwitterBot:
         if self.debug:
             print("Fetching %s timeline." % (user))
         stats = api.GetUserTimeline(
-            screen_name=user, count=self.__max_items, include_rts=False)
+            screen_name=user, count=self.__max_items,
+            include_rts=False, exclude_replies=True)
         uniq_text = set()
         for stat in stats:
             t = stat.created_at_in_seconds
@@ -175,6 +176,7 @@ class TwitterBot:
             for user in users:
                 report[user] = self._get_report(user, remove)
             self._send_report(topic, self._make_text(report))
+            time.sleep(2)
 
 
 def cmdArgs():
