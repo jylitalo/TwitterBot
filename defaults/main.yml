@@ -10,16 +10,10 @@ twitter_access_token_key: invalid
 twitter_access_token_secret: invalid
 
 ###
-# Twitter users that we track
+# Topics for tracking
 ###
-twitter_users: jylitalo
-
-###
-# Values for mail message
-###
-mail_from: bot@twitbot.invalid
-mail_to: one@twitbot.invalid,second@twitbot.invalid
-mail_subject: Twitter feed from ...
+topics:
+- { topic: bot, users: jylitalo, from: bot@twitbot.invalid, mailto: "one@twitbot.invalid,second@twitbot.invalid", subject: "Twitter feed from ..."}
 
 ###
 # Deployment details
