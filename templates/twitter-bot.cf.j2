@@ -6,9 +6,10 @@ access_token_secret={{ twitter_access_token_secret }}
 
 {% for item in topics %}
 [{{item.topic}}]
-users={{ item.twitter_users }}
-from={{ item.mail_from }}
-mailto={{ item.mail_to }}
-subject={{ item.mail_subject }}
+users={{ item.users }}
+from={{ item.from }}
+mailto={{ item.mailto }}
+subject={{ item.subject }}
+remove={{ item.remove }}
 
 {% endfor %}
