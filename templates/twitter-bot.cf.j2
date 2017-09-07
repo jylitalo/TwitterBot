@@ -4,8 +4,11 @@ consumer_secret={{ twitter_consumer_secret }}
 access_token_key={{ twitter_access_token_key }}
 access_token_secret={{ twitter_access_token_secret }}
 
-[bot]
-users={{ twitter_users }}
-from={{ mail_from }}
-mailto={{ mail_to }}
-subject={{ mail_subject }}
+{% for item in topics %}
+[{{item.topic}}]
+users={{ item.twitter_users }}
+from={{ item.mail_from }}
+mailto={{ item.mail_to }}
+subject={{ item.mail_subject }}
+
+{% endfor %}
