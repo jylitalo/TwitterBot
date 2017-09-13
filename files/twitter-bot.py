@@ -113,12 +113,10 @@ class TwitterBot(object):
             tweet_time = stat.created_at_in_seconds
             if tweet_time < timespan:
                 break
-            full_text = clean_tweet(stat.full_text)
+            full_text = clean_tweet(stat.full_text, remove)
             text = full_text.strip()
             if text and text[-1] == '.':
                 text = text[-1]
-            if remove:
-                text = text.replace(remove, '').replace('  ', ' ')
             if text in uniq_text:
                 skipped_items += 1
             else:
@@ -195,17 +193,24 @@ class TwitterBot(object):
             time.sleep(2)
 
 
-def clean_tweet(text):
+def clean_tweet(text, remove):
     """
     Clean unnecessary stuff out from tweet and
     dig final destination of URLs.
     """
     text = text[:text.rfind(' ')].replace('\n', ' ')
+    if remove:
+        text = text.replace(remove, '').replace('  ', ' ')
     for word in text.split(' '):
         if word.startswith('http://') or word.startswith('https://'):
-            response = requests.get(word, allow_redirects=False)
-            if 'location' in response.headers:
-                text = text.replace(word, response.headers['location'])
+            url = word
+            while url:
+              response = requests.get(url, allow_redirects=False)
+              if 'location' in response.headers:
+                url = response.headers['location']
+              else:
+                text = text.replace(word, url)
+                break
     return text
 
 
