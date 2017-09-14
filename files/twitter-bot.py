@@ -198,19 +198,23 @@ def clean_tweet(text, remove):
     Clean unnecessary stuff out from tweet and
     dig final destination of URLs.
     """
-    text = text[:text.rfind(' ')].replace('\n', ' ')
+    text = text.replace('\n', ' ')
     if remove:
         text = text.replace(remove, '').replace('  ', ' ')
     for word in text.split(' '):
         if word.startswith('http://') or word.startswith('https://'):
             url = word
-            while url:
+            count = 0
+            while url and count < 10:
+              count += 1
               response = requests.get(url, allow_redirects=False)
-              if 'location' in response.headers:
-                url = response.headers['location']
-              else:
-                text = text.replace(word, url)
-                break
+              if 'location' not in response.headers:
+                  break
+              elif not response.headers['location'].startswith('http'):
+                  break
+              else: 
+                  url = response.headers['location']
+            text = text.replace(word, url)
     return text
 
 
