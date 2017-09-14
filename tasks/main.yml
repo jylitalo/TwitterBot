@@ -1,5 +1,8 @@
 ---
 # tasks file for TwitterBot
+- name: removes legacy versions
+  file: path="{{twitbot_home}}/twitter-bot.{{item}}" state=absent
+  with_items: ["cf", "py"]
 - name: install pip
   package:
     name: python-pip
@@ -22,7 +25,7 @@
     mode: 0700
 - name: copy python script
   copy:
-    src: "{{ role_path }}/files/twitter-bot.py"
+    src: "{{ role_path }}/files/twitbot.py"
     dest: "{{ twitbot_bin }}"
     owner: "{{ twitbot_user }}"
     mode: 0700
