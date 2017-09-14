@@ -1,7 +1,9 @@
 #!/usr/bin/python
-# pip install python-twitter
-# Created by Juha Ylitalo <juha@ylitalot.net>
-# License: MIT
+"""
+pip install python-twitter
+Created by Juha Ylitalo <juha@ylitalot.net>
+License: MIT
+"""
 # pylint: disable=superfluous-parens
 
 import argparse
@@ -206,14 +208,14 @@ def clean_tweet(text, remove):
             url = word
             count = 0
             while url and count < 10:
-              count += 1
-              response = requests.get(url, allow_redirects=False)
-              if 'location' not in response.headers:
-                  break
-              elif not response.headers['location'].startswith('http'):
-                  break
-              else: 
-                  url = response.headers['location']
+                count += 1
+                response = requests.get(url, allow_redirects=False)
+                if 'location' not in response.headers:
+                    break
+                elif not response.headers['location'].startswith('http'):
+                    break
+                else:
+                    url = response.headers['location']
             text = text.replace(word, url)
     return text
 
