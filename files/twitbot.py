@@ -207,15 +207,18 @@ def clean_tweet(text, remove):
         if word.startswith('http://') or word.startswith('https://'):
             url = word
             count = 0
-            while url and count < 10:
-                count += 1
-                response = requests.get(url, allow_redirects=False)
-                if 'location' not in response.headers:
-                    break
-                elif not response.headers['location'].startswith('http'):
-                    break
-                else:
-                    url = response.headers['location']
+            try:
+                while url and count < 10:
+                    count += 1
+                    response = requests.get(url, allow_redirects=False)
+                    if 'location' not in response.headers:
+                        break
+                    elif not response.headers['location'].startswith('http'):
+                        break
+                    else:
+                        url = response.headers['location']
+            except Exception as e:
+                print("Unexception error: " + str(e))
             text = text.replace(word, url)
     return text
 
