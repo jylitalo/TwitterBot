@@ -96,7 +96,7 @@ class TwitterBot(object):
                 tweet_mode='extended')
         return self._api
 
-    def _get_report(self, user, remove):
+    def _get_report(self, user, remove, include_query_string):
         """
         Fetch unique tweets from single Twitter account.
         """
@@ -115,7 +115,7 @@ class TwitterBot(object):
             tweet_time = stat.created_at_in_seconds
             if tweet_time < timespan:
                 break
-            full_text = clean_tweet(stat.full_text, remove)
+            full_text = clean_tweet(stat.full_text, remove, include_query_string)
             text = full_text.strip()
             if text and text[-1] == '.':
                 text = text[-1]
@@ -185,17 +185,20 @@ class TwitterBot(object):
             report = {}
             users = config.get(topic, 'users').split(',')
             remove = None
+            include_query_string = True
             if config.has_option(topic, 'remove'):
                 remove = config.get(topic, 'remove')
+            if config.has_option(topic, 'query_string'):
+                include_query_string = config.getboolean(topic, 'query_string')
             for user in users:
-                report[user] = self._get_report(user, remove)
+                report[user] = self._get_report(user, remove, include_query_string)
             msg = self._make_text(report)
             if msg:
                 self._send_report(topic, msg)
             time.sleep(2)
 
 
-def clean_tweet(text, remove):
+def clean_tweet(text, remove, include_query_string):
     """
     Clean unnecessary stuff out from tweet and
     dig final destination of URLs.
@@ -205,20 +208,23 @@ def clean_tweet(text, remove):
         text = text.replace(remove, '').replace('  ', ' ')
     for word in text.split(' '):
         if word.startswith('http://') or word.startswith('https://'):
+            # pylint: disable=broad-except
             url = word
             count = 0
             try:
                 while url and count < 10:
                     count += 1
-                    response = requests.get(url, allow_redirects=False)
+                    response = requests.head(url, allow_redirects=False)
                     if 'location' not in response.headers:
                         break
                     elif not response.headers['location'].startswith('http'):
                         break
                     else:
                         url = response.headers['location']
-            except Exception as e:
-                print("Unexception error: " + str(e))
+            except Exception as problem:
+                print("Unexception error: " + str(problem))
+            if url and not include_query_string and '?' in url:
+                url = url[:url.find('?')]
             text = text.replace(word, url)
     return text
 
