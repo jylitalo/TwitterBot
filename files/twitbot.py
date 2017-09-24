@@ -96,7 +96,7 @@ class TwitterBot(object):
                 tweet_mode='extended')
         return self._api
 
-    def _get_report(self, user, remove, include_query_string):
+    def _get_report(self, user, remove):
         """
         Fetch unique tweets from single Twitter account.
         """
@@ -115,7 +115,7 @@ class TwitterBot(object):
             tweet_time = stat.created_at_in_seconds
             if tweet_time < timespan:
                 break
-            full_text = clean_tweet(stat.full_text, remove, include_query_string)
+            full_text = clean_tweet(stat.full_text, remove)
             text = full_text.strip()
             if text and text[-1] == '.':
                 text = text[-1]
@@ -184,28 +184,26 @@ class TwitterBot(object):
         for topic in topics:
             report = {}
             users = config.get(topic, 'users').split(',')
-            remove = None
-            include_query_string = True
-            if config.has_option(topic, 'remove'):
-                remove = config.get(topic, 'remove')
-            if config.has_option(topic, 'query_string'):
-                include_query_string = config.getboolean(topic, 'query_string')
+            remove = {'query_string': False, 'text': False}
+            for key in ['query_string', 'text']:
+                if config.has_option(topic, 'remove_' + key):
+                    remove[key] = config.get(topic, 'remove_' + key)
             for user in users:
-                report[user] = self._get_report(user, remove, include_query_string)
+                report[user] = self._get_report(user, remove)
             msg = self._make_text(report)
             if msg:
                 self._send_report(topic, msg)
             time.sleep(2)
 
 
-def clean_tweet(text, remove, include_query_string):
+def clean_tweet(text, remove):
     """
     Clean unnecessary stuff out from tweet and
     dig final destination of URLs.
     """
-    text = text.replace('\n', ' ')
-    if remove:
-        text = text.replace(remove, '').replace('  ', ' ')
+    if remove['text']:
+        text = text.replace(remove['text'], '')
+    text = text.replace('\n', ' ').replace('  ', ' ')
     for word in text.split(' '):
         if word.startswith('http://') or word.startswith('https://'):
             # pylint: disable=broad-except
@@ -223,7 +221,7 @@ def clean_tweet(text, remove, include_query_string):
                         url = response.headers['location']
             except Exception as problem:
                 print("Unexception error: " + str(problem))
-            if url and not include_query_string and '?' in url:
+            if url and remove['query_string'] and '?' in url:
                 url = url[:url.find('?')]
             text = text.replace(word, url)
     return text
