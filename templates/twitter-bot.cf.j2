@@ -10,6 +10,11 @@ users={{ item.users }}
 from={{ item.from }}
 mailto={{ item.mailto }}
 subject={{ item.subject }}
-remove={{ item.remove }}
+{% if item.remove_query_string is defined -%}
+remove_query_string={{ item.remove_query_string }}
+{% endif %}
+{% if item.remove_text is defined -%}
+remove_text={{ item.remove_text }}
+{% endif %}
 
 {% endfor %}
