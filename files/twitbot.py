@@ -184,10 +184,11 @@ class TwitterBot(object):
         for topic in topics:
             report = {}
             users = config.get(topic, 'users').split(',')
-            remove = {'query_string': False, 'text': False}
+            remove = {'query_string': "", 'text': ""}
             for key in ['query_string', 'text']:
                 if config.has_option(topic, 'remove_' + key):
                     remove[key] = config.get(topic, 'remove_' + key)
+            remove['query_string'] = remove['query_string'].lower() in ['yes','true']
             for user in users:
                 report[user] = self._get_report(user, remove)
             msg = self._make_text(report)
