@@ -188,7 +188,7 @@ class TwitterBot(object):
             for key in ['query_string', 'text']:
                 if config.has_option(topic, 'remove_' + key):
                     remove[key] = config.get(topic, 'remove_' + key)
-            remove['query_string'] = remove['query_string'].lower() in ['yes','true']
+            remove['query_string'] = remove['query_string'].lower() in ['yes', 'true']
             for user in users:
                 report[user] = self._get_report(user, remove)
             msg = self._make_text(report)
@@ -221,7 +221,9 @@ def clean_tweet(text, remove):
                     else:
                         url = response.headers['location']
             except Exception as problem:
-                print("Unexception error: " + str(problem))
+                print("Unexpected exception error: " + str(problem))
+                print("Word was " + word)
+                print("URL was " + url)
             if url and remove['query_string'] and '?' in url:
                 url = url[:url.find('?')]
             text = text.replace(word, url)
