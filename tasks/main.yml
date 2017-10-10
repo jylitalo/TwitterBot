@@ -1,7 +1,9 @@
 ---
 # tasks file for TwitterBot
 - name: removes legacy versions
-  file: path="{{twitbot_home}}/twitter-bot.{{item}}" state=absent
+  file:
+    path: "{{twitbot_home}}/twitter-bot.{{item}}"
+    state: absent
   with_items: ["cf", "py"]
 - name: install pip
   package:
@@ -29,23 +31,13 @@
     dest: "{{ twitbot_bin }}"
     owner: "{{ twitbot_user }}"
     mode: 0700
-- name: copy configuration file
-  copy:
-    src: "{{ twitbot_cf }}"
-    dest: "{{ twitbot_conf }}"
-    owner: "{{ twitbot_user }}"
-    mode: 0600
-  when: twitbot_cf != ""
 - name: install configuration from template
   template:
-    src: "{{ role_path }}/templates/twitter-bot.cf.j2"
+    src: "{{ role_path }}/templates/twitbot.cf.j2"
     dest: "{{ twitbot_conf }}"
     owner: "{{ twitbot_user }}"
     mode: 0600
-    backup: yes
-  when: twitbot_cf == ""
-- name: validate installation
-  shell: "{{ twitbot_bin }} --config {{ twitbot_conf }} --validate"
+    validate: "{{ twitbot_bin }} --config {{ twitbot_conf }} --validate"
 - name: schedule reporting
   cron:
     name: TwitterBot
