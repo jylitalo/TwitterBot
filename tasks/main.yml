@@ -1,10 +1,5 @@
 ---
 # tasks file for TwitterBot
-- name: removes legacy versions
-  file:
-    path: "{{twitbot_home}}/twitter-bot.{{item}}"
-    state: absent
-  with_items: ["cf", "py"]
 - name: install pip
   package:
     name: python-pip
