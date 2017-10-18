@@ -37,7 +37,7 @@
     dest: "{{ twitbot_conf }}"
     owner: "{{ twitbot_user }}"
     mode: 0600
-    validate: "{{ twitbot_bin }} --config {{ twitbot_conf }} --validate"
+    validate: "{{ twitbot_bin }} --config %s --validate"
 - name: schedule reporting
   cron:
     name: TwitterBot
