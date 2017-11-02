@@ -11,6 +11,8 @@ import os
 import smtplib
 import sys
 import time
+import traceback
+import unicodedata
 
 from ConfigParser import ConfigParser
 from email.mime.text import MIMEText
@@ -154,7 +156,7 @@ class TwitterBot(object):
             text += ['*'*len(text[-1])]
             for tweet in report[user]:
                 text += [time.asctime(time.localtime(tweet[0]))]
-                text += [' '*5 + tweet[1].encode('utf-8')]
+                text += [' '*5 + tweet[1]]
             text += [self._make_summary(found, skipped), '']
             tweets_found = True
         if not tweets_found:
@@ -186,23 +188,28 @@ class TwitterBot(object):
         Main method.
         Read config, fetch tweets, form report and send it to recipients.
         """
+        # pylint: disable=broad-except
         config = self._get_config()
         topics = config.sections()
+        topics.sort()
         topics.remove('api')
         for topic in topics:
-            report = {}
-            users = config.get(topic, 'users').split(',')
-            remove = {'query_string': "", 'text': ""}
-            for key in ['query_string', 'text']:
-                if config.has_option(topic, 'remove_' + key):
-                    remove[key] = config.get(topic, 'remove_' + key)
-            remove['query_string'] = remove['query_string'].lower() in ['yes', 'true']
-            for user in users:
-                report[user] = self._get_report(user, remove)
-            msg = self._make_text(report)
-            if msg:
-                self._send_report(topic, msg)
-            time.sleep(2)
+            try:
+                report = {}
+                users = config.get(topic, 'users').split(',')
+                remove = {'query_string': "", 'text': ""}
+                for key in ['query_string', 'text']:
+                    if config.has_option(topic, 'remove_' + key):
+                        remove[key] = config.get(topic, 'remove_' + key)
+                remove['query_string'] = remove['query_string'].lower() in ['yes', 'true']
+                for user in users:
+                    report[user] = self._get_report(user, remove)
+                msg = self._make_text(report)
+                if msg:
+                    self._send_report(topic, msg)
+                time.sleep(2)
+            except Exception as problem:
+                log_error("Problem with %s topic. Details are:\n%s" % (topic, str(problem)))
 
 
 def make_heading(users):
@@ -256,21 +263,19 @@ def is_http_link(url):
     return url.startswith('http://') or url.startswith('https://')
 
 
-def log_error(problem, text, word, url):
+def log_error(message):
     """
-    Log error from clean_tweet.
+    Log error message.
     """
-    print("Unexpected exception error: " + str(problem))
-    print("Tweet was " + text)
-    print("Word was " + word)
-    print("URL was " + url)
-
+    print(message)
+    traceback.print_exc()
 
 def sanitize_text(text, remove_text):
     """
     If tweets has some phrase that we want removed, it is done here.
     We also replace any newlines with space.
     """
+    text = unicodedata.normalize('NFKC', text).encode('utf-8')
     if remove_text:
         text = text.replace(remove_text, '')
     return text.replace('\n', ' ')
@@ -290,7 +295,10 @@ def extend_url(word, text):
             else:
                 break
     except Exception as problem:
-        log_error(problem, text, word, url)
+        log_error("""Unexpected exception error: %s
+Tweet was %s
+Word was %s
+URL was %s""" % (str(problem), text, word, url))
     return url
 
 
