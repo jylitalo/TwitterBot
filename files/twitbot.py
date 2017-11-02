@@ -216,7 +216,7 @@ def make_heading(users):
     return (users, text)
 
 
-def is_status_photo(tweet, word, url):
+def is_status_media(tweet, word, url):
     """
     Check if URL is embedded photo/video.
 
@@ -227,20 +227,26 @@ def is_status_photo(tweet, word, url):
     >>>
     >>> tweet = Tweet()
     >>> tweet.id_str, tweet.full_text = id_str, word
-    >>> is_status_photo(tweet, word, url)
+    >>> is_status_media(tweet, word, url)
     True
     >>> tweet.full_text = word + " test"
-    >>> is_status_photo(tweet, word, url)
+    >>> is_status_media(tweet, word, url)
     False
+    >>> word = url = 'https://twitter.com/Google/status/%s/video/1' % (id_str)
+    >>> is_status_media(tweet, word, url)
+    True
     >>> word = url = tweet.full_text = 'https://www.youtube.com/watch?v=PIbeiddq_CQ'
-    >>> is_status_photo(tweet, word, url)
+    >>> is_status_media(tweet, word, url)
     False
     """
     id_str = tweet.id_str
     text = tweet.full_text
+    is_media = False
     if not text.endswith(word) or not url.startswith('https://twitter.com/'):
         return False
-    return url.endswith("status/%s/photo/1" % (id_str))
+    for media in ['photo', 'video']:
+        is_media |= url.endswith("status/%s/%s/1" % (id_str, media))
+    return is_media
 
 
 def is_http_link(url):
@@ -299,7 +305,7 @@ def clean_tweet(tweet, remove):
     for word in text.split(' '):
         if is_http_link(word):
             url = extend_url(word, text)
-            if has_links and is_status_photo(tweet, word, url):
+            if has_links and is_status_media(tweet, word, url):
                 continue
             if remove['query_string'] and '?' in url:
                 url = url[:url.find('?')]
