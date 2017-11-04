@@ -289,7 +289,7 @@ def extend_url(word, text):
     url = word
     try:
         for _ in range(10):
-            headers = requests.head(url, allow_redirects=False).headers
+            headers = requests.head(url, allow_redirects=False, verify=False).headers
             if 'location' in headers and is_http_link(headers['location']):
                 url = headers['location']
             else:
