@@ -60,30 +60,16 @@ class TwitterBot(object):
         """
         errors = []
         config = self._get_config()
-        sections = config.sections()
         # Validate Twitter API section
-        if 'api' in sections:
-            for key in ['access_token_key', 'access_token_secret',
-                        'consumer_key', 'consumer_secret', 'mail_from']:
-                if not config.has_option('api', key):
-                    errors += [key + ' is missing from api section.']
-            sections.remove('api')
+        if config.has_section('api'):
+            errors = validate_api_config(config.options('api'))
         else:
-            errors += ['api section missing from configuration file']
-
+            errors = ['api section missing from configuration file']
+        if errors:
+            return errors
         # Validate feeds
-        api = self._get_api()
-        for section in sections:
-            for key in ['mailto', 'subject', 'users']:
-                if not config.has_option(section, key):
-                    errors += [section + " doesn't have " + key]
-            if config.has_option(section, 'users'):
-                for user in config.get(section, 'users').split(','):
-                    try:
-                        api.GetUserTimeline(screen_name=user, count=1)
-                    except twitter.error.TwitterError, twit_error:
-                        msg = "[%s,users] %s => %s"
-                        errors += [msg % (section, user, str(twit_error))]
+        for topic in get_topics(config.sections()):
+            errors.extend(self.validate_topic_config(topic))
         return errors
 
     def _get_api(self):
@@ -137,17 +123,15 @@ class TwitterBot(object):
         """
         Format tweets into nice text.
         """
-        users, text = make_heading(report.keys())
+        users, text = make_email_heading(report.keys())
         tweets_found = False
         for user in users:
             found, skipped = report[user].pop(-1)
             if not found:
                 continue
-            text += ['%s - https://www.twitter.com/%s:' % (user, user)]
-            text += ['*'*len(text[-1])]
+            text += make_user_heading(user)
             for tweet in report[user]:
-                text += [time.asctime(time.localtime(tweet[0]))]
-                text += [' '*5 + tweet[1]]
+                text += make_tweet_message(tweet[0], tweet[1])
             text += [self._make_summary(found, skipped), '']
             tweets_found = True
         if not tweets_found:
@@ -181,10 +165,7 @@ class TwitterBot(object):
         # pylint: disable=broad-except
         config = self._get_config()
         sender = config.get('api', 'mail_from')
-        topics = config.sections()
-        topics.sort()
-        topics.remove('api')
-        for topic in topics:
+        for topic in get_topics(config.sections()):
             try:
                 report = {}
                 users = config.get(topic, 'users').split(',')
@@ -197,6 +178,28 @@ class TwitterBot(object):
                 time.sleep(2)
             except Exception as problem:
                 log_error("Problem with %s topic. Details are:\n%s" % (topic, str(problem)))
+
+    def validate_topic_config(self, topic):
+        """
+        Validate twitbot.cf config on single topic
+        """
+        errors = []
+        config = self._get_config()
+        mandatory = set(['mailto', 'subject', 'users'])
+        missing_options = list(set(config.options(topic)) - mandatory)
+        missing_options.sort()
+        for missing in missing_options:
+            errors += [topic + " doesn't have " + missing]
+        if 'users' in missing_options:
+            return errors
+        api = self._get_api()
+        for user in config.get(topic, 'users').split(','):
+            try:
+                api.GetUserTimeline(screen_name=user, count=1)
+            except twitter.error.TwitterError, twit_error:
+                msg = "[%s,users] %s => %s"
+                errors += [msg % (topic, user, str(twit_error))]
+        return errors
 
 
 class TweetFilter(object):
@@ -302,6 +305,14 @@ def filters(topic, config):
     return options
 
 
+def get_topics(topics):
+    """
+    Sort possible topics and remove 'api', since it has twitter credentials etc.
+    """
+    topics.remove('api')
+    topics.sort()
+    return topics
+
 def is_http_link(url):
     """
     is url is valid http or https link?
@@ -350,7 +361,7 @@ def log_error(message):
     traceback.print_exc()
 
 
-def make_heading(users):
+def make_email_heading(users):
     """
     Make nice heading for e-mails (if needed) and sort users.
     """
@@ -359,6 +370,21 @@ def make_heading(users):
         users.sort()
         text += ['Twitter report on: ' + ', '.join(users), '']
     return (users, text)
+
+
+def make_tweet_message(tstamp, text):
+    """
+    Turn timestamp and text into couple lines in e-mail.
+    """
+    return [time.asctime(time.localtime(tstamp)), ' '*5 + text]
+
+
+def make_user_heading(user):
+    """
+    Return username, twitter URL and line below it.
+    """
+    line = '%s - https://www.twitter.com/%s:' % (user, user)
+    return [line, '*'*len(line)]
 
 
 def sanitize_text(text, remove_text):
@@ -371,6 +397,19 @@ def sanitize_text(text, remove_text):
         text = text.replace(remove_text, '')
     return text.replace('\n', ' ')
 
+
+def validate_api_config(options):
+    """
+    Validate twitter API configuration (and mail_from option)
+    """
+    mandatory = ['access_token_key', 'access_token_secret',
+                 'consumer_key', 'consumer_secret', 'mail_from']
+    missing_options = list(set(options) - set(mandatory))
+    missing_options.sort()
+    errors = []
+    for option in missing_options:
+        errors += [option + ' is missing from api section.']
+    return errors
 
 def cmd_args():
     """
