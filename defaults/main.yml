@@ -12,8 +12,9 @@ twitter_access_token_secret: invalid
 ###
 # Topics for tracking
 ###
+mail_from: "bot@twitbot.invalid"
 topics:
-- { topic: bot, users: jylitalo, from: bot@twitbot.invalid, mailto: "one@twitbot.invalid,second@twitbot.invalid", subject: "Twitter feed from ..."}
+- { topic: bot, users: jylitalo, mailto: "one@twitbot.invalid,second@twitbot.invalid", subject: "Twitter feed from ..."}
 
 ###
 # Deployment details

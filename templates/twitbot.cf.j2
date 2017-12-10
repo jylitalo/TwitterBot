@@ -3,11 +3,11 @@ consumer_key={{ twitter_consumer_key }}
 consumer_secret={{ twitter_consumer_secret }}
 access_token_key={{ twitter_access_token_key }}
 access_token_secret={{ twitter_access_token_secret }}
+mail_from={{mail_from}}
 
 {% for item in topics %}
 [{{item.topic}}]
 users={{ item.users }}
-from={{ item.from }}
 mailto={{ item.mailto }}
 subject={{ item.subject }}
 {% if item.remove_query_string is defined -%}
@@ -15,6 +15,9 @@ remove_query_string={{ item.remove_query_string }}
 {% endif %}
 {% if item.remove_text is defined -%}
 remove_text={{ item.remove_text }}
+{% endif %}
+{% if item.remove_tweets is defined -%}
+remove_tweets={{ item.remove_tweets }}
 {% endif %}
 
 {% endfor %}
