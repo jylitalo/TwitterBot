@@ -86,24 +86,23 @@ class TwitterBot(object):
                 tweet_mode='extended')
         return self._api
 
-    def _get_report(self, user, remove):
+    def _get_report(self, twitter_user, remove):
         """
         Fetch unique tweets from single Twitter account.
         """
         report = []
-        days = 1
-        api = self._get_api()
         if self.debug:
-            print("Fetching %s timeline." % (user))
-        tweets = api.GetUserTimeline(
-            screen_name=user, count=self.__max_items, trim_user=True,
+            print("Fetching %s timeline." % (twitter_user))
+        # 86400s => 1 day
+        tweet_filter = TweetFilter(remove, self._started - 86400)
+        tweets = self._get_api().GetUserTimeline(
+            screen_name=twitter_user, count=self.__max_items, trim_user=True,
             include_rts=False, exclude_replies=True)
-        tweet_filter = TweetFilter(remove, self._started - (days*86400))
         for tweet in tweets:
             text = tweet_filter.clean_tweet(tweet)
             if tweet_filter.is_unique(text):
-                report.append((tweet.created_at_in_seconds, text))
-        report.append((tweet_filter.uniques(), tweet_filter.duplicates()))
+                report += [(tweet.created_at_in_seconds, text)]
+        report += [(tweet_filter.uniques(), tweet_filter.duplicates())]
         return report
 
     def _make_summary(self, found, skipped):
@@ -168,10 +167,9 @@ class TwitterBot(object):
         for topic in get_topics(config.sections()):
             try:
                 report = {}
-                users = config.get(topic, 'users').split(',')
                 remove = filters(topic, config)
-                for user in users:
-                    report[user] = self._get_report(user, remove)
+                for twitter_user in config.get(topic, 'users').split(','):
+                    report[user] = self._get_report(twitter_user, remove)
                 msg = self._make_text(report)
                 if msg:
                     self._send_report(sender, topic, msg)
