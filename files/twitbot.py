@@ -219,11 +219,11 @@ class TweetFilter(object):
         dig final destination of URLs.
         """
         if tweet.created_at_in_seconds < self.timespan:
-            return ""
+            return ''
         text = sanitize_text(tweet.full_text, self.remove['text'])
         for spam in self.remove['tweets']:
-            if spam in text:
-                return ""
+            if sanitize_text(spam, '') in text:
+                return ''
         ret = []
         has_links = False
         for word in text.split(' '):
@@ -237,7 +237,7 @@ class TweetFilter(object):
                 has_links = True
             elif word:
                 ret += [word]
-        return " ".join(ret)
+        return ' '.join(ret)
 
     def duplicates(self):
         """
