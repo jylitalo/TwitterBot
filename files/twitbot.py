@@ -186,7 +186,7 @@ class TwitterBot(object):
         errors = []
         config = self._get_config()
         mandatory = set(['mailto', 'subject', 'users'])
-        missing_options = list(set(config.options(topic)) - mandatory)
+        missing_options = list(mandatory - set(config.options(topic)))
         missing_options.sort()
         for missing in missing_options:
             errors += [topic + " doesn't have " + missing]
