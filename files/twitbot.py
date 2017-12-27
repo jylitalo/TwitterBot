@@ -169,13 +169,15 @@ class TwitterBot(object):
                 report = {}
                 remove = filters(topic, config)
                 for twitter_user in config.get(topic, 'users').split(','):
-                    report[twitter_user] = self._get_tweets(twitter_user, remove)
+                    report[twitter_user] = self._get_tweets(
+                        twitter_user, remove)
                 msg = self._make_email_text(report)
                 if msg:
                     self._send_email(sender, topic, msg)
                 time.sleep(2)
             except Exception as problem:
-                log_error("Problem with %s topic. Details are:\n%s" % (topic, str(problem)))
+                log_error("Problem with %s topic. Details are:\n%s" %
+                          (topic, str(problem)))
 
     def validate_topic_config(self, topic):
         """
@@ -276,7 +278,8 @@ def extend_url(word, text):
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     try:
         for _ in range(10):
-            headers = requests.head(url, allow_redirects=False, verify=False).headers
+            headers = requests.head(
+                url, allow_redirects=False, verify=False).headers
             if 'location' in headers and is_http_link(headers['location']):
                 url = headers['location']
             else:
@@ -289,6 +292,13 @@ URL was %s""" % (str(problem), text, word, url))
     return url
 
 
+def is_true(string):
+    """
+    Given string is a word yes or true in lowercase, uppercase or mixture.
+    """
+    return string.lower() in ['yes', 'true']
+
+
 def filters(topic, config):
     """
     Analyze topic specific filters.
@@ -297,7 +307,7 @@ def filters(topic, config):
     for key in options:
         if config.has_option(topic, 'remove_' + key):
             options[key] = config.get(topic, 'remove_' + key)
-    options['query_string'] = options['query_string'].lower() in ['yes', 'true']
+    options['query_string'] = is_true(options['query_string'])
     if options['tweets']:
         options['tweets'] = json.loads(options['tweets'])
     return options
@@ -305,11 +315,13 @@ def filters(topic, config):
 
 def get_topics(topics):
     """
-    Sort possible topics and remove 'api', since it has twitter credentials etc.
+    Sort possible topics list and remove 'api',
+    since it has twitter credentials etc.
     """
     topics.remove('api')
     topics.sort()
     return topics
+
 
 def is_http_link(url):
     """
@@ -337,7 +349,7 @@ def is_status_media(tweet, word, url):
     >>> word = url = 'https://twitter.com/Google/status/%s/video/1' % (id_str)
     >>> is_status_media(tweet, word, url)
     True
-    >>> word = url = tweet.full_text = 'https://www.youtube.com/watch?v=PIbeiddq_CQ'
+    >>> word = url = tweet.full_text = 'https://www.youtube.com/watch?v=PIq_CQ'
     >>> is_status_media(tweet, word, url)
     False
     """
@@ -408,6 +420,7 @@ def validate_api_config(options):
     for option in missing_options:
         errors += [option + ' is missing from api section.']
     return errors
+
 
 def cmd_args():
     """
