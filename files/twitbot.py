@@ -284,6 +284,11 @@ def extend_url(word, text):
                 url = headers['location']
             else:
                 break
+    except requests.ConnectionError as problem:
+        log_error("""ConnectionError: %s
+Tweet was %s
+Word was %s
+URL was %s""" % (str(problem), text, word, url))
     except Exception as problem:
         log_error("""Unexpected exception error: %s
 Tweet was %s
