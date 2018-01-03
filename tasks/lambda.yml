@@ -1,0 +1,94 @@
+---
+# tasks file for TwitterBot
+- name: creates staging area for zip
+  tempfile:
+    state: directory
+    suffix: twitbot
+  register: staging_dir
+- name: staging area is ...
+  debug: msg="staging area is {{ staging_dir.path }}"
+- name: twitter API for python
+  pip:
+    name: python-twitter
+    extra_args: "-I -t {{ staging_dir.path }}"
+    executable: "pip3"
+    state: present
+  when: state == "present"
+- name: python script into staging
+  copy:
+    src: "{{ role_path }}/files/twitbot.py"
+    dest: "{{ staging_dir.path }}/twitbot.py"
+  when: state == "present"
+- name: configuration into staging
+  template:
+    src: "{{ role_path }}/templates/twitbot.cf.j2"
+    dest: "{{ staging_dir.path }}/twitbot.cf"
+  when: state == "present"
+- name: everything in staging should be world readable
+  file:
+    path: "{{ staging_dir.path }}"
+    mode: "u=rwx,go=rx"
+- name: lambda zip
+  shell: "zip -X -r {{ staging_dir.path }}/../twitbot.zip ."
+  args:
+    chdir: "{{ staging_dir.path }}"
+- name: copy zip to tmp
+  copy:
+    src: "{{ staging_dir.path }}/../twitbot.zip"
+    dest: "/tmp/staging.zip"
+- name: role for lambda
+  iam_role:
+    name: twitbot
+    assume_role_policy_document: "{{ lookup('file','role_policy.json') }}"
+    state: "{{ state }}"
+  register: twitbot_role
+- name: lambda_function
+  lambda:
+    name: twitbot
+    state: "{{ state }}"
+    zip_file: "{{ staging_dir.path }}/../twitbot.zip"
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    role: "{{ twitbot_role.iam_role.arn }}"
+    runtime: "python3.6"
+    handler: "twitbot.lambda_handler"
+    timeout: 300
+    environment_variables:
+      SMTP_USER: "{{ smtp_user }}"
+      SMTP_PASSWORD: "{{ smtp_password }}"
+      SMTP_HOST: "{{ smtp_host }}"
+      SMTP_PORT: "{{ smtp_port }}"
+      TWITTER_CONSUMER_KEY: "{{ twitter_consumer_key }}"
+      TWITTER_CONSUMER_SECRET: "{{ twitter_consumer_secret }}"
+      TWITTER_ACCESS_TOKEN_KEY: "{{ twitter_access_token_key }}"
+      TWITTER_ACCESS_TOKEN_SECRET: "{{ twitter_access_token_secret }}"
+  register: twitbot_lambda
+- name: cloudwatchevent_rule
+  cloudwatchevent_rule:
+    name: twitbot_schedule
+    description: "Run twitbot daily"
+    schedule_expression: "rate(1 day)"
+    state: "{{ state }}"
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    targets:
+      - id: twitbot_rule
+        arn: "{{ twitbot_lambda.configuration.function_arn }}"
+  register: twitbot_rule
+- name: lambda_policy
+  lambda_policy:
+    state: "{{ state }}"
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    function_name: twitbot
+    statement_id: twitbot_sid
+    action: "lambda:InvokeFunction"
+    principal: "events.amazonaws.com"
+    source_arn: "{{ twitbot_rule.targets[0].arn }}"
+- name: cleanup staging area
+  file:
+    name: "{{ item }}"
+    state: absent
+  with_items:
+    - "{{ staging_dir.path }}/../twitbot.zip"
+    - "{{ staging_dir.path }}"
