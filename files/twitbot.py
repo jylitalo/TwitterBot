@@ -1,10 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """
 pip install python-twitter
 Created by Juha Ylitalo <juha@ylitalot.net>
 License: MIT
 """
-# pylint: disable=superfluous-parens
 
 import argparse
 import json
@@ -13,9 +12,8 @@ import smtplib
 import sys
 import time
 import traceback
-import unicodedata
 
-from ConfigParser import ConfigParser
+from configparser import ConfigParser
 from email.mime.text import MIMEText
 
 import requests
@@ -28,29 +26,15 @@ class TwitterBot(object):
     Fetches tweets through Twitter API, filter them and
     send them to recipients.
     """
-    def __init__(self, cf_file='.twitter-bot.cf', debug=False):
+    def __init__(self, config):
         """
         Init instance variables.
         """
         self._api = None
-        self._cf = None
-        self.cf_file = cf_file
-        self.debug = debug
+        self._cf = config
+        self.debug = config.getboolean('api', 'debug', fallback=False)
         self._started = time.time()
         self.__max_items = 100
-
-    def _get_config(self):
-        """
-        Read configuration file.
-        """
-        can_read = os.access(self.cf_file, os.R_OK)
-        assert can_read, 'Unable to open %s for reading.' % (self.cf_file)
-        if not self._cf:
-            self._cf = ConfigParser()
-            self._cf.read(self.cf_file)
-            api_found = 'api' in self._cf.sections()
-            assert api_found, 'Twitter API credentials missing.'
-        return self._cf
 
     def validate_config(self):
         """
@@ -59,16 +43,15 @@ class TwitterBot(object):
         If errors were found, return list of findings
         """
         errors = []
-        config = self._get_config()
         # Validate Twitter API section
-        if config.has_section('api'):
-            errors = validate_api_config(config.options('api'))
+        if self._cf.has_section('api'):
+            errors = validate_api_config(self._cf.options('api'))
         else:
             errors = ['api section missing from configuration file']
         if errors:
             return errors
         # Validate feeds
-        for topic in get_topics(config.sections()):
+        for topic in get_topics(self._cf.sections()):
             errors.extend(self.validate_topic_config(topic))
         return errors
 
@@ -77,12 +60,11 @@ class TwitterBot(object):
         Get handler for Twitter API.
         """
         if not self._api:
-            config = self._get_config()
             self._api = twitter.Api(
-                access_token_key=config.get('api', 'access_token_key'),
-                access_token_secret=config.get('api', 'access_token_secret'),
-                consumer_key=config.get('api', 'consumer_key'),
-                consumer_secret=config.get('api', 'consumer_secret'),
+                access_token_key=self._cf.get('api', 'access_token_key'),
+                access_token_secret=self._cf.get('api', 'access_token_secret'),
+                consumer_key=self._cf.get('api', 'consumer_key'),
+                consumer_secret=self._cf.get('api', 'consumer_secret'),
                 tweet_mode='extended')
         return self._api
 
@@ -122,7 +104,7 @@ class TwitterBot(object):
         """
         Format tweets into nice text.
         """
-        users, text = make_email_heading(report.keys())
+        users, text = make_email_heading(list(report.keys()))
         tweets_found = False
         for user in users:
             found, skipped = report[user].pop(-1)
@@ -142,17 +124,20 @@ class TwitterBot(object):
         """
         Send report as e-mail.
         """
-        config = self._get_config()
-        you = config.get(topic, 'mailto')
+        you = self._cf.get(topic, 'mailto')
         msg = MIMEText(text)
-        msg['Subject'] = config.get(topic, 'subject')
+        msg['Subject'] = self._cf.get(topic, 'subject')
 
         msg['From'] = sender
         msg['To'] = you
         if self.debug:
             print(msg.as_string())
         else:
-            smtp = smtplib.SMTP('localhost')
+            smtp = smtplib.SMTP(self._cf.get('api', 'smtp_host'),
+                                self._cf.get('api', 'smtp_port'))
+            if self._cf.has_option('api', 'smtp_user'):
+                smtp.login(self._cf.get('api', 'smtp_user'),
+                           self._cf.get('api', 'smtp_password'))
             smtp.sendmail(sender, you.split(','), msg.as_string())
             smtp.quit()
 
@@ -162,13 +147,12 @@ class TwitterBot(object):
         Read config, fetch tweets, form report and send it to recipients.
         """
         # pylint: disable=broad-except
-        config = self._get_config()
-        sender = config.get('api', 'mail_from')
-        for topic in get_topics(config.sections()):
+        sender = self._cf.get('api', 'mail_from')
+        for topic in get_topics(self._cf.sections()):
             try:
                 report = {}
-                remove = filters(topic, config)
-                for twitter_user in config.get(topic, 'users').split(','):
+                remove = filters(topic, self._cf)
+                for twitter_user in self._cf.get(topic, 'users').split(','):
                     report[twitter_user] = self._get_tweets(
                         twitter_user, remove)
                 msg = self._make_email_text(report)
@@ -176,27 +160,28 @@ class TwitterBot(object):
                     self._send_email(sender, topic, msg)
                 time.sleep(2)
             except Exception as problem:
-                log_error("Problem with %s topic. Details are:\n%s" %
-                          (topic, str(problem)))
+                log_error_with_stack(
+                    "Problem with %s topic. Details are:\n%s" %
+                    (topic, str(problem))
+                )
 
     def validate_topic_config(self, topic):
         """
         Validate twitbot.cf config on single topic
         """
         errors = []
-        config = self._get_config()
         mandatory = set(['mailto', 'subject', 'users'])
-        missing_options = list(mandatory - set(config.options(topic)))
+        missing_options = list(mandatory - set(self._cf.options(topic)))
         missing_options.sort()
         for missing in missing_options:
             errors += [topic + " doesn't have " + missing]
         if 'users' in missing_options:
             return errors
         api = self._get_api()
-        for user in config.get(topic, 'users').split(','):
+        for user in self._cf.get(topic, 'users').split(','):
             try:
                 api.GetUserTimeline(screen_name=user, count=1)
-            except twitter.error.TwitterError, twit_error:
+            except twitter.error.TwitterError as twit_error:
                 msg = "[%s,users] %s => %s"
                 errors += [msg % (topic, user, str(twit_error))]
         return errors
@@ -222,9 +207,10 @@ class TweetFilter(object):
         """
         if tweet.created_at_in_seconds < self.timespan:
             return ''
-        text = sanitize_text(tweet.full_text, self.remove['text'])
+        text = tweet.full_text
+        text = text.replace('\n', '').replace(self.remove['text'], '')
         for spam in self.remove['tweets']:
-            if sanitize_text(spam, '') in text:
+            if spam in text:
                 return ''
         ret = []
         has_links = False
@@ -279,18 +265,23 @@ def extend_url(word, text):
     try:
         for _ in range(10):
             headers = requests.head(
-                url, allow_redirects=False, verify=False).headers
+                url, allow_redirects=False, verify=False, timeout=5).headers
             if 'location' in headers and is_http_link(headers['location']):
                 url = headers['location']
             else:
                 break
-    except requests.ConnectionError as problem:
-        log_error("""ConnectionError: %s
+    except requests.exceptions.ConnectionError as problem:
+        log_error("""ConnectionError:
 Tweet was %s
 Word was %s
-URL was %s""" % (str(problem), text, word, url))
+URL was %s""" % (text, word, url))
+    except requests.exceptions.ReadTimeout as problem:
+        log_error("""ReadTimeout:
+Tweet was %s
+Word was %s
+URL was %s""" % (text, word, url))
     except Exception as problem:
-        log_error("""Unexpected exception error: %s
+        log_error_with_stack("""Unexpected exception error: %s
 Tweet was %s
 Word was %s
 URL was %s""" % (str(problem), text, word, url))
@@ -373,6 +364,13 @@ def log_error(message):
     Log error message.
     """
     print(message)
+
+
+def log_error_with_stack(message):
+    """
+    Log error message with stacktrace.
+    """
+    print(message)
     traceback.print_exc()
 
 
@@ -402,24 +400,14 @@ def make_user_heading(user):
     return [line, '*'*len(line)]
 
 
-def sanitize_text(text, remove_text):
-    """
-    If tweets has some phrase that we want removed, it is done here.
-    We also replace any newlines with space.
-    """
-    text = unicodedata.normalize('NFKC', text).encode('utf-8')
-    if remove_text:
-        text = text.replace(remove_text, '')
-    return text.replace('\n', ' ')
-
-
 def validate_api_config(options):
     """
     Validate twitter API configuration (and mail_from option)
     """
     mandatory = ['access_token_key', 'access_token_secret',
-                 'consumer_key', 'consumer_secret', 'mail_from']
-    missing_options = list(set(options) - set(mandatory))
+                 'consumer_key', 'consumer_secret', 'mail_from',
+                 'smtp_host', 'smtp_port']
+    missing_options = list(set(mandatory) - set(options))
     missing_options.sort()
     errors = []
     for option in missing_options:
@@ -433,7 +421,7 @@ def cmd_args():
     """
     parser = argparse.ArgumentParser(description='TwitterBot for digests')
     parser.add_argument('--config', help='configuration file',
-                        default='.twitter-bot.cf')
+                        default='.twitbot.cf')
     parser.add_argument('--debug', action='store_true',
                         help='print report instead of sending e-mail')
     parser.add_argument('--validate', action='store_true',
@@ -441,9 +429,40 @@ def cmd_args():
     return parser
 
 
+def get_config(cf_file):
+    """
+    Read configuration file.
+    """
+    can_read = os.access(cf_file, os.R_OK)
+    assert can_read, 'Unable to open %s for reading.' % (cf_file)
+    config = ConfigParser()
+    config.read(cf_file)
+    assert 'api' in config.sections(), 'API credentials missing.'
+    return config
+
+
+# pylint: disable=unused-argument
+def lambda_handler(event, context):
+    """
+    Main method for Lambda version.
+    """
+    config = get_config('twitbot.cf')
+    config.set('api', 'debug', 'False')
+    for key in os.environ:
+        if key.startswith('SMTP_'):
+            config.set('api', key.lower(), os.environ[key])
+        elif key.startswith('TWITTER_'):
+            config.set('api', key.lower().split('_', 1)[1], os.environ[key])
+    TwitterBot(config).make_reports()
+    return True
+
+
 if __name__ == '__main__':
     ARGS = cmd_args().parse_args(sys.argv[1:])
-    BOT = TwitterBot(ARGS.config, ARGS.debug)
+    CONFIG = get_config(ARGS.config)
+    if ARGS.debug:
+        CONFIG.set('api', 'debug', str(ARGS.debug))
+    BOT = TwitterBot(CONFIG)
     if ARGS.validate:
         ERRORS = BOT.validate_config()
         if ERRORS:
