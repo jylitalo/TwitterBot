@@ -16,6 +16,8 @@ mail_from: "bot@twitbot.invalid"
 topics:
 - { topic: bot, users: jylitalo, mailto: "one@twitbot.invalid,second@twitbot.invalid", subject: "Twitter feed from ..."}
 
+mode: "linux"
+state: "present"
 ###
 # Deployment details
 ###
