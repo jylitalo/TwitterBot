@@ -42,6 +42,13 @@
     assume_role_policy_document: "{{ lookup('file','role_policy.json') }}"
     state: "{{ state }}"
   register: twitbot_role
+- name: policy for role
+  iam_policy:
+    iam_type: role
+    iam_name: twitbot
+    policy_name: CloudWatchLogs
+    state: present
+    policy_json: "{{ lookup('file','logs_policy.json') }}"
 - name: lambda_function
   lambda:
     name: twitbot
@@ -52,6 +59,7 @@
     role: "{{ twitbot_role.iam_role.arn }}"
     runtime: "python3.6"
     handler: "twitbot.lambda_handler"
+    memory_size: 512
     timeout: 300
     environment_variables:
       SMTP_USER: "{{ smtp_user }}"
@@ -67,7 +75,7 @@
   cloudwatchevent_rule:
     name: twitbot_schedule
     description: "Run twitbot daily"
-    schedule_expression: "rate(1 day)"
+    schedule_expression: "cron(0 6 * * ? *)"
     state: "{{ state }}"
     aws_access_key: "{{ aws_access_key_id }}"
     aws_secret_key: "{{ aws_secret_access_key }}"
