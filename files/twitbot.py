@@ -15,6 +15,7 @@ import traceback
 
 from configparser import ConfigParser
 from email.mime.text import MIMEText
+from multiprocessing import Process
 
 import requests
 import twitter
@@ -141,28 +142,47 @@ class TwitterBot(object):
             smtp.sendmail(sender, you.split(','), msg.as_string())
             smtp.quit()
 
+    def _handle_topic(self, topic):
+        try:
+            report = {}
+            remove = filters(topic, self._cf)
+            for twitter_user in self._cf.get(topic, 'users').split(','):
+                report[twitter_user] = self._get_tweets(
+                    twitter_user, remove)
+            msg = self._make_email_text(report)
+            if msg:
+                sender = self._cf.get('api', 'mail_from')
+                self._send_email(sender, topic, msg)
+            time.sleep(2)
+        except Exception as problem:
+            log_error_with_stack(
+                "Problem with %s topic. Details are:\n%s" %
+                (topic, str(problem))
+            )
+
     def make_reports(self):
         """
         Main method.
         Read config, fetch tweets, form report and send it to recipients.
         """
         # pylint: disable=broad-except
-        sender = self._cf.get('api', 'mail_from')
+        pids = []
         for topic in get_topics(self._cf.sections()):
             try:
-                report = {}
-                remove = filters(topic, self._cf)
-                for twitter_user in self._cf.get(topic, 'users').split(','):
-                    report[twitter_user] = self._get_tweets(
-                        twitter_user, remove)
-                msg = self._make_email_text(report)
-                if msg:
-                    self._send_email(sender, topic, msg)
-                time.sleep(2)
+                pid = Process(target=self._handle_topic, args=(topic,))
+                pids += [pid]
+                pid.start()
             except Exception as problem:
                 log_error_with_stack(
-                    "Problem with %s topic. Details are:\n%s" %
+                    "Problem with starting on %s topic. Details are:\n%s" %
                     (topic, str(problem))
+                )
+        for pid in pids:
+            try:
+                pid.join()
+            except Exception as problem:
+                log_error_with_stack(
+                    "Problem with joining. Details are:\n%s" % str(problem)
                 )
 
     def validate_topic_config(self, topic):
@@ -357,6 +377,13 @@ def is_status_media(tweet, word, url):
     for media in ['photo', 'video']:
         is_media |= url.endswith("status/%s/%s/1" % (id_str, media))
     return is_media
+
+
+def log(message):
+    """
+    Log non-error message.
+    """
+    print(message)
 
 
 def log_error(message):
