@@ -88,11 +88,12 @@
     state: "{{ state }}"
     aws_access_key: "{{ aws_access_key_id }}"
     aws_secret_key: "{{ aws_secret_access_key }}"
-    function_name: twitbot
+    function_name: "{{ twitbot_lambda.configuration.function_name }}"
+    version: "{{ twitbot_lambda.configuration.version }}"
     statement_id: twitbot_sid
     action: "lambda:InvokeFunction"
     principal: "events.amazonaws.com"
-    source_arn: "{{ twitbot_rule.targets[0].arn }}"
+    source_arn: "{{ twitbot_rule.rule.arn }}"
 - name: cleanup staging area
   file:
     name: "{{ item }}"
