@@ -9,6 +9,14 @@
     name: python-twitter
     state: "{{ state }}"
     executable: "pip3"
+- name: remove reporting from schedule
+  cron:
+    name: TwitterBot
+    job: "{{ twitbot_bin }} --config {{ twitbot_conf }}"
+    special_time: daily
+    user: "{{ twitbot_user }}"
+    state: "{{ state }}"
+  when: state != "present"
 - name: user for cronjob
   user:
     name: "{{ twitbot_user }}"
@@ -50,3 +58,4 @@
     special_time: daily
     user: "{{ twitbot_user }}"
     state: "{{ state }}"
+  when: state == "present"
