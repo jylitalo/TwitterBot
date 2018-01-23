@@ -295,11 +295,8 @@ def extend_url(word, text):
 Tweet was %s
 Word was %s
 URL was %s""" % (text, word, url))
-    except requests.exceptions.ReadTimeout as problem:
-        log_error("""ReadTimeout:
-Tweet was %s
-Word was %s
-URL was %s""" % (text, word, url))
+    except requests.exceptions.ReadTimeout:
+        pass
     except Exception as problem:
         log_error_with_stack("""Unexpected exception error: %s
 Tweet was %s
@@ -480,6 +477,8 @@ def lambda_handler(event, context):
             config.set('api', key.lower(), os.environ[key])
         elif key.startswith('TWITTER_'):
             config.set('api', key.lower().split('_', 1)[1], os.environ[key])
+        elif key == 'DEBUG':
+            config.set('api', key.lower(), os.environ[key])
     TwitterBot(config).make_reports()
     return True
 
