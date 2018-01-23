@@ -88,7 +88,7 @@ class TwitterBot(object):
         report += [(tweet_filter.uniques(), tweet_filter.duplicates())]
         return report
 
-    def _make_summary(self, found, skipped):
+    def _twitter_user_summary(self, found, skipped):
         """
         Statistics about how many tweets were found, skipped as duplicate, etc.
         """
@@ -101,20 +101,20 @@ class TwitterBot(object):
             msg[-1] += ': %d unique and %d duplicates.' % (found, skipped)
         return '\n'.join(msg)
 
-    def _make_email_text(self, report):
+    def _email_text(self, report):
         """
         Format tweets into nice text.
         """
-        users, text = make_email_heading(list(report.keys()))
+        users, text = email_heading(list(report.keys()))
         tweets_found = False
         for user in users:
             found, skipped = report[user].pop(-1)
             if not found:
                 continue
-            text += make_user_heading(user)
+            text += twitter_user_heading(user)
             for tweet in report[user]:
-                text += make_tweet_message(tweet[0], tweet[1])
-            text += [self._make_summary(found, skipped), '']
+                text += tweet_message(tweet[0], tweet[1])
+            text += [self._twitter_user_summary(found, skipped), '']
             tweets_found = True
         if not tweets_found:
             return None
@@ -149,7 +149,7 @@ class TwitterBot(object):
             for twitter_user in self._cf.get(topic, 'users').split(','):
                 report[twitter_user] = self._get_tweets(
                     twitter_user, remove)
-            msg = self._make_email_text(report)
+            msg = self._email_text(report)
             if msg:
                 sender = self._cf.get('api', 'mail_from')
                 self._send_email(sender, topic, msg)
@@ -398,7 +398,7 @@ def log_error_with_stack(message):
     traceback.print_exc()
 
 
-def make_email_heading(users):
+def email_heading(users):
     """
     Make nice heading for e-mails (if needed) and sort users.
     """
@@ -409,14 +409,14 @@ def make_email_heading(users):
     return (users, text)
 
 
-def make_tweet_message(tstamp, text):
+def tweet_message(tstamp, text):
     """
     Turn timestamp and text into couple lines in e-mail.
     """
     return [time.asctime(time.localtime(tstamp)), ' '*5 + text]
 
 
-def make_user_heading(user):
+def twitter_user_heading(user):
     """
     Return username, twitter URL and line below it.
     """
