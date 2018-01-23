@@ -144,6 +144,7 @@ class TwitterBot(object):
 
     def _handle_topic(self, topic):
         try:
+            start_time = time.time()
             report = {}
             remove = filters(topic, self._cf)
             for twitter_user in self._cf.get(topic, 'users').split(','):
@@ -153,7 +154,8 @@ class TwitterBot(object):
             if msg:
                 sender = self._cf.get('api', 'mail_from')
                 self._send_email(sender, topic, msg)
-            time.sleep(2)
+            end_time = time.time()
+            log("%s topic took %.1f seconds" % (topic, end_time - start_time))
         except Exception as problem:
             log_error_with_stack(
                 "Problem with %s topic. Details are:\n%s" %
