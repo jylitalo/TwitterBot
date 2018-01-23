@@ -49,6 +49,10 @@
     policy_name: CloudWatchLogs
     state: present
     policy_json: "{{ lookup('file','logs_policy.json') }}"
+- name: clear old lambda_functions
+  lambda:
+    name: twitbot
+    state: absent
 - name: lambda_function
   lambda:
     name: twitbot
@@ -59,7 +63,7 @@
     role: "{{ twitbot_role.iam_role.arn }}"
     runtime: "python3.6"
     handler: "twitbot.lambda_handler"
-    memory_size: 512
+    memory_size: 256
     timeout: 300
     environment_variables:
       SMTP_USER: "{{ smtp_user }}"
