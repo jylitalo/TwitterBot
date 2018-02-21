@@ -31,7 +31,7 @@ class TwitterBot(object):
         """
         Init instance variables.
         """
-        self._api = None
+        self.__api = None
         self._cf = config
         self.debug = config.getboolean('api', 'debug', fallback=False)
         self._started = time.time()
@@ -52,24 +52,24 @@ class TwitterBot(object):
         if errors:
             return errors
         # Validate feeds
-        for topic in get_topics(self._cf.sections()):
+        for topic in topics(self._cf.sections()):
             errors.extend(self.validate_topic_config(topic))
         return errors
 
-    def _get_api(self):
+    def _api(self):
         """
         Get handler for Twitter API.
         """
-        if not self._api:
-            self._api = twitter.Api(
+        if not self.__api:
+            self.__api = twitter.Api(
                 access_token_key=self._cf.get('api', 'access_token_key'),
                 access_token_secret=self._cf.get('api', 'access_token_secret'),
                 consumer_key=self._cf.get('api', 'consumer_key'),
                 consumer_secret=self._cf.get('api', 'consumer_secret'),
                 tweet_mode='extended')
-        return self._api
+        return self.__api
 
-    def _get_tweets(self, twitter_user, remove):
+    def _tweets(self, twitter_user, remove):
         """
         Fetch unique tweets from single Twitter account.
         """
@@ -78,7 +78,7 @@ class TwitterBot(object):
             print("Fetching %s timeline." % (twitter_user))
         # 86400s => 1 day
         tweet_filter = TweetFilter(remove, self._started - 86400)
-        tweets = self._get_api().GetUserTimeline(
+        tweets = self._api().GetUserTimeline(
             screen_name=twitter_user, count=self.__max_items, trim_user=True,
             include_rts=False, exclude_replies=True)
         for tweet in tweets:
@@ -143,13 +143,16 @@ class TwitterBot(object):
             smtp.quit()
 
     def _handle_topic(self, topic):
+        """
+        Handle topic from configuration file.
+        """
+        # pylint: disable=broad-except
         try:
             start_time = time.time()
             report = {}
             remove = filters(topic, self._cf)
             for twitter_user in self._cf.get(topic, 'users').split(','):
-                report[twitter_user] = self._get_tweets(
-                    twitter_user, remove)
+                report[twitter_user] = self._tweets(twitter_user, remove)
             msg = self._email_text(report)
             if msg:
                 sender = self._cf.get('api', 'mail_from')
@@ -169,7 +172,7 @@ class TwitterBot(object):
         """
         # pylint: disable=broad-except
         pids = []
-        for topic in get_topics(self._cf.sections()):
+        for topic in topics(self._cf.sections()):
             try:
                 pid = Process(target=self._handle_topic, args=(topic,))
                 pids += [pid]
@@ -199,10 +202,9 @@ class TwitterBot(object):
             errors += [topic + " doesn't have " + missing]
         if 'users' in missing_options:
             return errors
-        api = self._get_api()
         for user in self._cf.get(topic, 'users').split(','):
             try:
-                api.GetUserTimeline(screen_name=user, count=1)
+                self._api().GetUserTimeline(screen_name=user, count=1)
             except twitter.error.TwitterError as twit_error:
                 msg = "[%s,users] %s => %s"
                 errors += [msg % (topic, user, str(twit_error))]
@@ -328,14 +330,14 @@ def filters(topic, config):
     return options
 
 
-def get_topics(topics):
+def topics(sections):
     """
     Sort possible topics list and remove 'api',
     since it has twitter credentials etc.
     """
-    topics.remove('api')
-    topics.sort()
-    return topics
+    sections.remove('api')
+    sections.sort()
+    return sections
 
 
 def is_http_link(url):
