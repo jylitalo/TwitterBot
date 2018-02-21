@@ -10,7 +10,7 @@ smtp_port=25
 {% endif %}
 
 {% for item in topics %}
-[{{item.topic}}]
+[{{ item.topic }}]
 users={{ item.users }}
 mailto={{ item.mailto }}
 subject={{ item.subject }}
