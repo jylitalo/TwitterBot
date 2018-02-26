@@ -8,6 +8,7 @@ Hint: ansible_python_interpreter=/usr/local/bin/python3
 import os
 import stat
 
+import botocore
 import boto3
 from ansible.module_utils.basic import AnsibleModule
 
@@ -36,48 +37,66 @@ RETURNS = '''
 '''
 
 
-def scan(paginator, field, target):
-    for page in paginator:
-        for object in page:
-            if object[field] == target:
-                return object
-    return None
+S3 = boto3.client('s3')
 
 
-def get_bucket(s3, bucket_name):
-    buckets = s3.list_buckets()['Buckets']
-    return [bucket['Name'] for bucket in buckets if bucket_name == bucket['Name']]
+def bucket_exists(bucket_name):
+    """
+    Check if S3 bucket with bucket_name already exists.
+    """
+    buckets = S3.list_buckets()['Buckets']
+    return bool([
+        bucket['Name'] for bucket in buckets if bucket_name == bucket['Name']
+    ])
 
 
-def get_object(s3, bucket_name, object_key, content):
-    paginator = s3.get_paginator('list_objects').paginate(
-        Bucket=bucket_name,
-        Prefix=object_key
-    )
-    return scan(paginator, 'Key', object_key)
+def object_exists(bucket_name, s3_key, size):
+    """
+    Check if S3 bucket with bucket_name has object with s3_key, that is size in bytes.
+    """
+    obj = get_object(bucket_name, s3_key)
+    if obj:
+        return obj['ContentLength'] == size
+    return False
 
 
-def create_bucket(s3, bucket_name, aws_region):
-    s3.create_bucket(
+def get_object(bucket_name, object_key):
+    """
+    Get metadata from S3 object or return None.
+    """
+    try:
+        return S3.get_object(Bucket=bucket_name, Key=object_key)
+    except botocore.exceptions.ClientError:
+        return None
+
+
+def create_bucket(bucket_name, aws_region):
+    """
+    Creates S3 bucket.
+    """
+    return S3.create_bucket(
         ACL='private',
         Bucket=bucket_name,
         CreateBucketConfiguration={'LocationConstraint': aws_region}
     )
 
 
-def upload_content(s3, bucket_name, bucket_key, content):
-    s3.put_object(
+def upload_content(bucket_name, bucket_key, content):
+    """
+    Upload content (string or file) into bucket_name under bucket_key.
+    """
+    return S3.put_object(
         ACL='private',
         Bucket=bucket_name,
         Key=bucket_key,
         Body=content,
-        ContentLenght=len(content)
+        ContentLength=len(content)
     )
 
 
 def main():
     """
-    Implement postmap for Ansible.
+    Upload/update content in S3 bucket.
     """
     args = {
         'bucket': {'required': True, 'type': 'str'},
@@ -89,28 +108,31 @@ def main():
     }
     module = AnsibleModule(argument_spec=args, supports_check_mode=True)
     vals = {key: module.params[key] for key in args}
+    bucket, s3_key = vals['bucket'], vals['key']
     content = vals['content'].encode('utf-8')
 
-    s3 = boto3.client('s3')
-    bucket_found = get_bucket(s3, vals['bucket'])
-    object_found = None
+    bucket_found = bucket_exists(bucket)
+    key_found = None
     if bucket_found:
-        print("bucket_found=%s" %(bucket_found))
-        obj = get_object(s3, vals['bucket'], vals['key'], content)
         if vals['file']:
-            object_found = obj['Size'] == os.path.stat(vals['file'])[stat.ST_SIZE]
+            key_found = object_exists(bucket, s3_key, os.stat(vals['file'])[stat.ST_SIZE])
         else:
-            object_found = obj['Size'] == len(content)
-    changed = vals['state'] != 'present' or (bucket_found and object_found)
+            key_found = object_exists(bucket, s3_key, len(content))
+    changed = bool(vals['state'] != 'present' or not (bucket_found and key_found))
 
     if changed and not module.check_mode:
         if vals['state'] == 'present':
             if not bucket_found:
-                create_bucket(s3, vals['bucket'], vals['region'])
-            upload_content(s3, vals['bucket'], vals['key'], content)
+                create_bucket(bucket, vals['region'])
+            if content:
+                upload_content(bucket, s3_key, content)
+            else:
+                upload_content(bucket, s3_key, vals['file'])
         else:
-            s3.delete_object(Bucket=vals['bucket'], Key=vals['key'])
-            s3.delete_bucket(Bucket=vals['bucket'])
+            if key_found:
+                S3.delete_object(Bucket=bucket, Key=s3_key)
+            if bucket_found:
+                S3.delete_bucket(Bucket=bucket)
     module.exit_json(changed=changed)
 
 
