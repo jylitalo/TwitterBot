@@ -37,8 +37,7 @@ RETURNS = '''
 def normalize_path(filename, root_dir):
     if filename[0] == '/':
         return filename
-    else:
-        return root_dir + os.sep + filename
+    return root_dir + os.sep + filename
 
 
 def main():
@@ -61,8 +60,11 @@ def main():
         os.system("rsync -avH %s ./" % (abs_source))
         if vals['command']:
             os.system(vals['command'])
+        if os.access(zip_file, os.F_OK):
+            os.unlink(zip_file)
         # TODO: Build with python's ZipFile
-        os.system("zip %s -X -r %s" % (zip_file, vals['files']))
+        files = [line.strip() for line in os.popen(vals['files'], 'r').readlines()]
+        os.system("zip %s -X %s" % (zip_file, ' '.join(files)))
     os.chdir(cwd)
     module.exit_json()
 
