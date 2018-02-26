@@ -17,6 +17,7 @@ from configparser import ConfigParser
 from email.mime.text import MIMEText
 from multiprocessing import Process
 
+import boto3
 import requests
 import twitter
 import urllib3
@@ -461,10 +462,16 @@ def get_config(cf_file):
     """
     Read configuration file.
     """
-    can_read = os.access(cf_file, os.R_OK)
-    assert can_read, 'Unable to open %s for reading.' % (cf_file)
     config = ConfigParser()
-    config.read(cf_file)
+    if cf_file.startswith('s3://'):
+        bucket = cf_file[5:cf_file.find('/', 5)]
+        key = cf_file[cf_file.find('/', 5)+1:]
+        cf_string = boto3.client('s3').get_object(Bucket=bucket, Key=key)['Body']
+        config.read_string(cf_string)
+    else:
+        can_read = os.access(cf_file, os.R_OK)
+        assert can_read, 'Unable to open %s for reading.' % (cf_file)
+        config.read(cf_file)
     assert 'api' in config.sections(), 'API credentials missing.'
     return config
 
@@ -474,6 +481,7 @@ def lambda_handler(event, context):
     """
     Main method for Lambda version.
     """
+    cf_file = os.environ['CONFIG'] if 'CONFIG' in os.environ else 'twitbot.cf'
     config = get_config('twitbot.cf')
     config.set('api', 'debug', 'False')
     for key in os.environ:

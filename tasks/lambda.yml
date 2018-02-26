@@ -1,41 +1,16 @@
 ---
 # tasks file for TwitterBot
-- name: creates staging area for zip
-  tempfile:
-    state: directory
-    suffix: twitbot
-  register: staging_dir
-- name: staging area is ...
-  debug: msg="staging area is {{ staging_dir.path }}"
-- name: twitter API for python
-  pip:
-    name: python-twitter
-    extra_args: "-I -t {{ staging_dir.path }}"
-    executable: "pip3"
-    state: present
-  when: state == "present"
-- name: python script into staging
-  copy:
-    src: "{{ role_path }}/files/twitbot.py"
-    dest: "{{ staging_dir.path }}/twitbot.py"
-  when: state == "present"
-- name: configuration into staging
-  template:
-    src: "{{ role_path }}/templates/twitbot.cf.j2"
-    dest: "{{ staging_dir.path }}/twitbot.cf"
-  when: state == "present"
-- name: everything in staging should be world readable
-  file:
-    path: "{{ staging_dir.path }}"
-    mode: "u=rwx,go=rx"
-- name: lambda zip
-  shell: "zip -X -r {{ staging_dir.path }}/../twitbot.zip ."
-  args:
-    chdir: "{{ staging_dir.path }}"
-- name: copy zip to tmp
-  copy:
-    src: "{{ staging_dir.path }}/../twitbot.zip"
-    dest: "/tmp/staging.zip"
+- name: Build Lambda package
+  build_zip:
+    source: "{{ role_path }}/files/lambda"
+    command: "pip3 install -I -t ./ requirements.txt"
+    files: "."
+    zip_file: "{{ role_path }}/files/twitbot.zip"
+- name: Upload zip file into bucket
+  s3_object:
+    bucket: "{{ s3_bucket }}"
+    key: "twitbot.cf"
+    content: "{{ lookup('template', './twitbot.cf.j2') }}"
 - name: role for lambda
   iam_role:
     name: twitbot
@@ -48,7 +23,7 @@
     iam_name: twitbot
     policy_name: CloudWatchLogs
     state: present
-    policy_json: "{{ lookup('file','logs_policy.json') }}"
+    policy_json: "{{ lookup('template','actions_policy.json.j2') }}"
 - name: clear old lambda_functions
   lambda:
     name: twitbot
@@ -57,7 +32,7 @@
   lambda:
     name: twitbot
     state: "{{ state }}"
-    zip_file: "{{ staging_dir.path }}/../twitbot.zip"
+    zip_file: "{{ role_path }}/files/twitbot.zip"
     aws_access_key: "{{ aws_access_key_id }}"
     aws_secret_key: "{{ aws_secret_access_key }}"
     role: "{{ twitbot_role.iam_role.arn }}"
@@ -66,6 +41,7 @@
     memory_size: 256
     timeout: 300
     environment_variables:
+      S3_BUCKET: "{{ s3_bucket }}"
       SMTP_USER: "{{ smtp_user }}"
       SMTP_PASSWORD: "{{ smtp_password }}"
       SMTP_HOST: "{{ smtp_host }}"
@@ -98,10 +74,3 @@
     action: "lambda:InvokeFunction"
     principal: "events.amazonaws.com"
     source_arn: "{{ twitbot_rule.rule.arn }}"
-- name: cleanup staging area
-  file:
-    name: "{{ item }}"
-    state: absent
-  with_items:
-    - "{{ staging_dir.path }}/../twitbot.zip"
-    - "{{ staging_dir.path }}"
