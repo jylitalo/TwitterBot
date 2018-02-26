@@ -466,8 +466,8 @@ def get_config(cf_file):
     if cf_file.startswith('s3://'):
         bucket = cf_file[5:cf_file.find('/', 5)]
         key = cf_file[cf_file.find('/', 5)+1:]
-        cf_string = boto3.client('s3').get_object(Bucket=bucket, Key=key)['Body']
-        config.read_string(cf_string)
+        body = boto3.client('s3').get_object(Bucket=bucket, Key=key)['Body']
+        config.read_string(body.read().decode('utf-8'))
     else:
         can_read = os.access(cf_file, os.R_OK)
         assert can_read, 'Unable to open %s for reading.' % (cf_file)
@@ -482,7 +482,7 @@ def lambda_handler(event, context):
     Main method for Lambda version.
     """
     cf_file = os.environ['CONFIG'] if 'CONFIG' in os.environ else 'twitbot.cf'
-    config = get_config('twitbot.cf')
+    config = get_config(cf_file)
     config.set('api', 'debug', 'False')
     for key in os.environ:
         if key.startswith('SMTP_'):
