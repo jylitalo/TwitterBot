@@ -25,3 +25,6 @@ twitbot_user: twitbot
 twitbot_home: /home/twitbot
 twitbot_bin: "{{ twitbot_home }}/twitbot.py"
 twitbot_conf: "{{ twitbot_home }}/twitbot.cf"
+###
+region: "eu-west-1"
+s3_bucket: "twitbot-{{ ansible_env.USER }}"
