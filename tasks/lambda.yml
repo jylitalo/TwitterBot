@@ -2,11 +2,16 @@
 # tasks file for TwitterBot
 - name: Build Lambda package
   build_zip:
-    source: "{{ role_path }}/files/lambda"
-    command: "pip3 install -I -t ./ requirements.txt"
-    files: "."
+    source: "{{ role_path }}/files/lambda/"
+    command: "pip3 install -I -t ./ -r requirements.txt"
+    files: "find . '!' -name '*.pyc' -type f -print"
     zip_file: "{{ role_path }}/files/twitbot.zip"
 - name: Upload zip file into bucket
+  s3_object:
+    bucket: "{{ s3_bucket }}"
+    key: "twitbot.zip"
+    file: "{{ role_path }}/files/twitbot.zip"
+- name: Upload configuration file into bucket
   s3_object:
     bucket: "{{ s3_bucket }}"
     key: "twitbot.cf"
@@ -41,7 +46,7 @@
     memory_size: 256
     timeout: 300
     environment_variables:
-      S3_BUCKET: "{{ s3_bucket }}"
+      CONFIG: "s3://{{ s3_bucket }}/twitbot.cf"
       SMTP_USER: "{{ smtp_user }}"
       SMTP_PASSWORD: "{{ smtp_password }}"
       SMTP_HOST: "{{ smtp_host }}"
